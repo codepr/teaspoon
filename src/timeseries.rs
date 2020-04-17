@@ -64,7 +64,7 @@ impl<'a> TimeSeries<'a> {
                 let last_ts = ((last.timestamp / interval) * interval) + interval;
                 let mut current_ts = first_ts + interval;
                 let mut avgs: Vec<f64> = Vec::new();
-                while current_ts < last_ts {
+                while current_ts <= last_ts {
                     let range: Vec<f64> = self.records
                         .borrow()
                         .iter()
@@ -134,7 +134,7 @@ fn test_ts_avg_interval() {
     ts.add_point(&r3);
     ts.add_point(&r4);
     let avg = ts.avg_interval(500 as u128).unwrap();
-    assert_eq!(avg, [14.9625]);
+    assert_eq!(avg, [12.98, 15.454999999999998, 15.96]);
 }
 
 #[test]
