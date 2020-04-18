@@ -7,6 +7,8 @@ use std::io::{Read, Write};
 const BUFSIZE: usize = 4096;
 const MAXEVENTS: usize = 1024;
 
+// Simple client abstraction, composed by a TcpStream (basically a socket connection) and a
+// dedicated dynamic buffer, a vector of u8 type
 pub struct Client {
     stream: TcpStream,
     buffer: Vec<u8>,
@@ -19,6 +21,7 @@ impl Client {
             buffer: Vec::new(),
         }
     }
+
     pub fn dump_buffer(&mut self, buffer: &[u8; BUFSIZE], n: usize) {
         for b in &buffer[0..n] {
             self.buffer.push(*b);
@@ -46,6 +49,8 @@ impl Client {
     }
 }
 
+// Utterly simple server object, just an IPv4 address and a port plus a mapping of the connected
+// clients
 pub struct Server {
     addr: String,
     port: i32,

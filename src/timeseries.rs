@@ -1,10 +1,13 @@
-use std::ops::Index;
-use std::thread::sleep;
-use std::option::Option;
 use std::cmp::PartialEq;
+use std::ops::Index;
+use std::option::Option;
+use std::thread::sleep;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-#[derive (Debug)]
+// A record of the timeseries, represents a point defined as a tuple (timestamp, value), as a
+// future improvement it will probably also contain some sorts of labels to be used as a secondary
+// indexes
+#[derive(Debug)]
 pub struct Record {
     timestamp: u128,
     value: f64,
@@ -12,29 +15,34 @@ pub struct Record {
 
 impl PartialEq for Record {
     fn eq(&self, r: &Record) -> bool {
-        return self.value == r.value && self.timestamp == r.timestamp
+        return self.value == r.value && self.timestamp == r.timestamp;
     }
 }
 
 impl Record {
     pub fn new(value: f64) -> Record {
-        let ctime = SystemTime::now().duration_since(UNIX_EPOCH).expect("Unable to get now");
+        let ctime = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Unable to get now");
         Record {
             timestamp: ctime.as_millis(),
-            value: value
+            value: value,
         }
     }
 }
 
+// Main timeseries struct, just a name that univocally identifies it, an optional retention policy
+// which essentially defines how long the timeseries will be (as a difference of age between the
+// latest point inserted and the oldest). A creation time as information meta and a vector of
+// records, the points of the timeseries.
 pub struct TimeSeries {
     name: String,
-    retention: i64,
+    retention: Option<i64>,
     ctime: u128,
-    records: Vec<Record>
+    records: Vec<Record>,
 }
 
 impl Index<usize> for TimeSeries {
-
     type Output = Record;
 
     fn index(&self, i: usize) -> &Record {
@@ -43,14 +51,15 @@ impl Index<usize> for TimeSeries {
 }
 
 impl TimeSeries {
-
-    pub fn new(name: String, retention: i64) -> TimeSeries {
-        let ctime = SystemTime::now().duration_since(UNIX_EPOCH).expect("Unable to get now");
+    pub fn new(name: String, retention: Option<i64>) -> TimeSeries {
+        let ctime = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Unable to get now");
         TimeSeries {
             name: name,
             retention: retention,
             ctime: ctime.as_millis(),
-            records: Vec::new()
+            records: Vec::new(),
         }
     }
 
@@ -59,10 +68,7 @@ impl TimeSeries {
     }
 
     pub fn avg(&self) -> f64 {
-        let a: f64 = self.records
-            .iter()
-            .map(|x| x.value)
-            .sum::<f64>() / self.records.len() as f64;
+        let a: f64 = self.records.iter().map(|x| x.value).sum::<f64>() / self.records.len() as f64;
         return a;
     }
 
@@ -75,21 +81,20 @@ impl TimeSeries {
                 let mut current_ts = first_ts + interval;
                 let mut avgs: Vec<f64> = Vec::new();
                 while current_ts <= last_ts {
-                    let range: Vec<f64> = self.records
+                    let range: Vec<f64> = self
+                        .records
                         .iter()
-                        .filter(|v| v.timestamp > current_ts-interval
-                            && v.timestamp < current_ts)
-                        .map(|x| x.value).collect();
+                        .filter(|v| v.timestamp > current_ts - interval && v.timestamp < current_ts)
+                        .map(|x| x.value)
+                        .collect();
                     if range.len() > 0 {
-                        avgs.push(
-                            range.iter().sum::<f64>() / range.len() as f64
-                        );
+                        avgs.push(range.iter().sum::<f64>() / range.len() as f64);
                     }
                     current_ts += interval;
                 }
                 return Some(avgs);
-            },
-            None => return None
+            }
+            None => return None,
         };
     }
 
@@ -98,7 +103,7 @@ impl TimeSeries {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.records.len() == 0
+        return self.records.len() == 0;
     }
 
     pub fn max(&self) -> Option<f64> {
@@ -108,9 +113,9 @@ impl TimeSeries {
         let first = self.records[0].value;
         return Some(
             self.records
-            .iter()
-            .map(|x| x.value)
-            .fold(first, |max, val| if val > max { val } else { max })
+                .iter()
+                .map(|x| x.value)
+                .fold(first, |max, val| if val > max { val } else { max }),
         );
     }
 
@@ -121,9 +126,9 @@ impl TimeSeries {
         let first = self.records[0].value;
         return Some(
             self.records
-            .iter()
-            .map(|x| x.value)
-            .fold(first, |min, val| if min < val { min } else { val })
+                .iter()
+                .map(|x| x.value)
+                .fold(first, |min, val| if min < val { min } else { val }),
         );
     }
 
@@ -138,14 +143,14 @@ impl TimeSeries {
 
 #[test]
 fn test_ts_new() {
-    let ts = TimeSeries::new("test-ts".to_string(), 3000);
+    let ts = TimeSeries::new("test-ts".to_string(), Some(3000));
     assert_eq!(ts.name, "test-ts");
-    assert_eq!(ts.retention, 3000);
+    assert_eq!(ts.retention, Some(3000));
 }
 
 #[test]
 fn test_ts_add_point() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     let r = Record::new(12.98);
     ts.add_point(r);
     assert_eq!(ts.records.len(), 1);
@@ -154,7 +159,7 @@ fn test_ts_add_point() {
 
 #[test]
 fn test_ts_avg() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     let r1 = Record::new(12.98);
     let r2 = Record::new(19.63);
     let r3 = Record::new(11.28);
@@ -169,7 +174,7 @@ fn test_ts_avg() {
 
 #[test]
 fn test_ts_avg_interval() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     let r1 = Record::new(12.98);
     sleep(Duration::new(0, 5e8 as u32));
     let r2 = Record::new(19.63);
@@ -186,7 +191,7 @@ fn test_ts_avg_interval() {
 
 #[test]
 fn test_ts_index() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     let r1 = Record::new(12.98);
     let r2 = Record::new(19.63);
     let r3 = Record::new(11.28);
@@ -201,7 +206,7 @@ fn test_ts_index() {
 
 #[test]
 fn test_ts_len() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     assert_eq!(ts.len(), 0);
     let r1 = Record::new(12.98);
     ts.add_point(r1);
@@ -210,7 +215,7 @@ fn test_ts_len() {
 
 #[test]
 fn test_ts_is_empty() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     assert_eq!(ts.is_empty(), true);
     let r1 = Record::new(12.98);
     ts.add_point(r1);
@@ -219,7 +224,7 @@ fn test_ts_is_empty() {
 
 #[test]
 fn test_ts_max() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     let r1 = Record::new(12.98);
     let r2 = Record::new(19.63);
     let r3 = Record::new(11.28);
@@ -233,7 +238,7 @@ fn test_ts_max() {
 
 #[test]
 fn test_ts_min() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     let r1 = Record::new(12.98);
     let r2 = Record::new(19.63);
     let r3 = Record::new(11.28);
@@ -247,7 +252,7 @@ fn test_ts_min() {
 
 #[test]
 fn test_ts_search() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
     let r1 = Record::new(12.98);
     sleep(Duration::new(0, 5e8 as u32));
     let r2 = Record::new(19.63);
