@@ -24,7 +24,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::cmp::PartialEq;
+use std::cmp::{Ordering, PartialEq};
 use std::ops::Index;
 use std::option::Option;
 use std::thread::sleep;
@@ -33,7 +33,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 // A record of the timeseries, represents a point defined as a tuple (timestamp, value), as a
 // future improvement it will probably also contain some sorts of labels to be used as a secondary
 // indexes
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Record {
     timestamp: u128,
     value: f64,
@@ -159,7 +159,18 @@ impl TimeSeries {
     }
 
     pub fn search(&self, val: u128) -> Result<usize, usize> {
-        return self.records.binary_search_by(|r| r.timestamp.cmp(&val));
+        return self
+            .records
+            .binary_search_by(|r| r.timestamp.cmp(&val).then(Ordering::Greater));
+    }
+
+    pub fn range(&self, lo: u128, hi: u128) -> Option<Vec<Record>> {
+        if self.is_empty() {
+            return None;
+        }
+        let start = self.search(lo).unwrap_err();
+        let end = self.search(hi).unwrap_err();
+        return Some(self.records[start..end + 1].to_vec());
     }
 }
 
@@ -291,8 +302,29 @@ fn test_ts_search() {
     ts.add_point(r2);
     ts.add_point(r3);
     ts.add_point(r4);
-    assert_eq!(ts.search(timestamp_1), Ok(2));
+    assert_eq!(ts.search(timestamp_1), Err(1));
     assert_eq!(ts.search(timestamp_2), Err(3));
+}
+
+#[test]
+fn test_ts_range() {
+    let mut ts = TimeSeries::new("test-ts".to_string(), None);
+    let r1 = Record::new(12.98);
+    sleep(Duration::new(0, 5e8 as u32));
+    let r2 = Record::new(19.63);
+    let r3 = Record::new(11.28);
+    sleep(Duration::new(0, 5e8 as u32));
+    let r4 = Record::new(15.96);
+    let timestamp_1 = r2.timestamp;
+    let timestamp_2 = r4.timestamp;
+    ts.add_point(r1);
+    ts.add_point(r2);
+    ts.add_point(r3);
+    ts.add_point(r4);
+    let range = ts.range(timestamp_1, timestamp_2).unwrap();
+    assert_eq!(range.len(), 3);
+    assert_eq!(range[0].value, 19.63);
+    assert_eq!(range[2].value, 15.96);
 }
 
 #[test]
