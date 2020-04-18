@@ -91,6 +91,12 @@ impl TimeSeries {
 
     pub fn add_point(&mut self, r: Record) {
         self.records.push(r);
+        if let Some(r) = self.retention {
+            let last = self.records.last().unwrap();
+            let oldest_valid = self.search(last.timestamp).unwrap_err();
+            // Shrink vector by dropping first 0..oldest_valid indexes values
+            self.records.drain(0..oldest_valid);
+        }
     }
 
     pub fn avg(&self) -> f64 {
