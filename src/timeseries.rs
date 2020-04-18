@@ -113,6 +113,17 @@ impl TimeSeries {
         );
     }
 
+    pub fn min(&self) -> Option<f64> {
+        if self.is_empty() {
+            return None;
+        }
+        return Some(
+            self.records
+            .iter()
+            .map(|x| x.value)
+            .fold(0.0f64, |min, val| if min < val { min } else { val })
+        );
+    }
 }
 
 //////////////////////
@@ -212,6 +223,20 @@ fn test_ts_max() {
     ts.add_point(r3);
     ts.add_point(r4);
     assert_eq!(ts.max(), Some(19.63));
+}
+
+#[test]
+fn test_ts_min() {
+    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let r1 = Record::new(12.98);
+    let r2 = Record::new(19.63);
+    let r3 = Record::new(11.28);
+    let r4 = Record::new(15.96);
+    ts.add_point(r1);
+    ts.add_point(r2);
+    ts.add_point(r3);
+    ts.add_point(r4);
+    assert_eq!(ts.min(), Some(11.28));
 }
 
 #[test]
