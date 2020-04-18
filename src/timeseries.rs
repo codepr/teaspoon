@@ -1,3 +1,4 @@
+use std::ops::Index;
 use std::thread::sleep;
 use std::option::Option;
 use std::cmp::PartialEq;
@@ -32,7 +33,17 @@ pub struct TimeSeries {
     records: Vec<Record>
 }
 
+impl Index<usize> for TimeSeries {
+
+    type Output = Record;
+
+    fn index(&self, i: usize) -> &Record {
+        return &self.records[i];
+    }
+}
+
 impl TimeSeries {
+
     pub fn new(name: String, retention: i64) -> TimeSeries {
         let ctime = SystemTime::now().duration_since(UNIX_EPOCH).expect("Unable to get now");
         TimeSeries {
@@ -81,6 +92,27 @@ impl TimeSeries {
             None => return None
         };
     }
+
+    pub fn len(&self) -> usize {
+        return self.records.len();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        return self.records.len() == 0
+    }
+
+    pub fn max(&self) -> Option<f64> {
+        if self.is_empty() {
+            return None;
+        }
+        return Some(
+            self.records
+            .iter()
+            .map(|x| x.value)
+            .fold(0.0f64, |max, val| if val > max { val } else { max })
+        );
+    }
+
 }
 
 //////////////////////
@@ -133,6 +165,53 @@ fn test_ts_avg_interval() {
     ts.add_point(r4);
     let avg = ts.avg_interval(500 as u128).unwrap();
     assert_eq!(avg, [12.98, 15.454999999999998, 15.96]);
+}
+
+#[test]
+fn test_ts_index() {
+    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let r1 = Record::new(12.98);
+    let r2 = Record::new(19.63);
+    let r3 = Record::new(11.28);
+    let r4 = Record::new(15.96);
+    ts.add_point(r1);
+    ts.add_point(r2);
+    ts.add_point(r3);
+    ts.add_point(r4);
+    assert_eq!(ts[1].value, 19.63);
+    assert_eq!(ts[3].value, 15.96);
+}
+
+#[test]
+fn test_ts_len() {
+    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    assert_eq!(ts.len(), 0);
+    let r1 = Record::new(12.98);
+    ts.add_point(r1);
+    assert_eq!(ts.len(), 1);
+}
+
+#[test]
+fn test_ts_is_empty() {
+    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    assert_eq!(ts.is_empty(), true);
+    let r1 = Record::new(12.98);
+    ts.add_point(r1);
+    assert_eq!(ts.is_empty(), false);
+}
+
+#[test]
+fn test_ts_max() {
+    let mut ts = TimeSeries::new("test-ts".to_string(), 0);
+    let r1 = Record::new(12.98);
+    let r2 = Record::new(19.63);
+    let r3 = Record::new(11.28);
+    let r4 = Record::new(15.96);
+    ts.add_point(r1);
+    ts.add_point(r2);
+    ts.add_point(r3);
+    ts.add_point(r4);
+    assert_eq!(ts.max(), Some(19.63));
 }
 
 #[test]
