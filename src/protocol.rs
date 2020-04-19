@@ -24,50 +24,57 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-trait Serializable {
-    fn serialize(&self) -> Vec<u8>;
-    fn deserialize(buf: &Vec<u8>) -> Self;
+use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
+
+struct TsPacket<'a, T>
+where
+    T: Serialize,
+    T: Deserialize<'a>,
+{
+    header: TsHeader,
+    packet: T,
+    phantom: PhantomData<&'a T>,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct TsHeader {
     byte: u8,
     size: usize,
 }
 
-struct TsPacket<T: Serializable> {
-    header: TsHeader,
-    packet: T,
-}
-
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct TsCreate {
     name: String,
     retention: i32,
 }
 
-impl Serializable for TsCreate {
-    fn serialize(&self) -> Vec<u8> {
-        // TODO
-        return Vec::new();
-    }
+pub fn serialize<T: Serialize>(o: &T) -> Vec<u8> {
+    return bincode::serialize(o).unwrap();
+}
 
-    fn deserialize(buf: &Vec<u8>) -> TsCreate {
-        // TODO
-        return TsCreate {};
-    }
+pub fn deserialize<'a, T: Deserialize<'a>>(b: &'a Vec<u8>) -> T {
+    return bincode::deserialize(&b[..]).unwrap();
 }
 
 #[test]
 fn test_create_serialize() {
-    let c = TsCreate { "ts-test".to_string(), 3000 };
-    let b = c.serialize();
-    assert_eq!(b.len(), 14);
+    let c = TsCreate {
+        name: "ts-test".to_string(),
+        retention: 3000,
+    };
+    let b = serialize(&c);
+    assert_eq!(b.len(), 19);
 }
 
 #[test]
 fn test_create_deserialize() {
-    let c = TsCreate { "ts-test".to_string(), 3000 };
-    let b = c.serialize();
-    assert_eq!(b.len(), 14);
-    let d = TsCreate::deserialize(b);
+    let c = TsCreate {
+        name: "ts-test".to_string(),
+        retention: 3000,
+    };
+    let b = serialize(&c);
+    assert_eq!(b.len(), 19);
+    let d: TsCreate = deserialize(&b);
     assert_eq!(d, c);
 }
