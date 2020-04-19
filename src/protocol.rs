@@ -27,6 +27,39 @@
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
+#[derive(Debug, PartialEq)]
+pub enum OpCode {
+    OpTsCreate,
+    OpTsDelete,
+    OpTsAddPoint,
+    OpTsMaddPoint,
+    OpTsQuery,
+}
+
+enum Status {
+    TsOk,
+    TsNotFount,
+    TsExists,
+    TsUnknownCmd,
+}
+
+trait AsOpcode {
+    fn as_opcode(self) -> Option<OpCode>;
+}
+
+impl AsOpcode for u8 {
+    fn as_opcode(self) -> Option<OpCode> {
+        match self {
+            0 => Some(OpCode::OpTsCreate),
+            1 => Some(OpCode::OpTsDelete),
+            2 => Some(OpCode::OpTsAddPoint),
+            3 => Some(OpCode::OpTsMaddPoint),
+            4 => Some(OpCode::OpTsQuery),
+            _ => None,
+        }
+    }
+}
+
 struct TsPacket<'a, T>
 where
     T: Serialize,
@@ -41,6 +74,12 @@ where
 struct TsHeader {
     byte: u8,
     size: usize,
+}
+
+impl TsHeader {
+    pub fn opcode(&self) -> Option<OpCode> {
+        return (self.byte >> 4).as_opcode();
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -64,6 +103,37 @@ pub fn deserialize<'a, T: Deserialize<'a>>(b: &'a Vec<u8>) -> T {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn test_header_opcode() {
+        let h = TsHeader {
+            byte: 0x00,
+            size: 0,
+        };
+        assert_eq!(h.opcode(), Some(OpCode::OpTsCreate));
+    }
+
+    #[test]
+    fn test_header_serialize() {
+        let c = TsHeader {
+            byte: 0x01,
+            size: 255,
+        };
+        let b = serialize(&c);
+        assert_eq!(b.len(), 9);
+    }
+
+    #[test]
+    fn test_header_deserialize() {
+        let c = TsHeader {
+            byte: 0x01,
+            size: 255,
+        };
+        let b = serialize(&c);
+        assert_eq!(b.len(), 9);
+        let d: TsHeader = deserialize(&b);
+        assert_eq!(d, c);
+    }
 
     #[test]
     fn test_create_serialize() {
