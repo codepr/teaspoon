@@ -60,6 +60,7 @@ impl AsOpcode for u8 {
     }
 }
 
+#[derive(Debug, PartialEq)]
 struct TsPacket<'a, T>
 where
     T: Serialize,
@@ -89,14 +90,48 @@ struct TsCreate {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct TsDelete(String);
-
-pub fn serialize<T: Serialize>(o: &T) -> Vec<u8> {
-    return bincode::serialize(o).unwrap();
+struct TsDelete {
+    name: String,
 }
 
-pub fn deserialize<'a, T: Deserialize<'a>>(b: &'a Vec<u8>) -> T {
-    return bincode::deserialize(&b[..]).unwrap();
+impl<'a, T> TsPacket<'a, T>
+where
+    T: Serialize,
+    T: Deserialize<'a>,
+{
+    pub fn from_binary(b: &'a Vec<u8>) -> Result<TsPacket<'a, T>, Box<bincode::ErrorKind>> {
+        if b.len() < 9 {
+            return Err(Box::new(bincode::ErrorKind::Custom(
+                "Not enough bytes".to_string(),
+            )));
+        }
+        let header: TsHeader = match bincode::deserialize(&b[..9]) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
+        let packet = match bincode::deserialize(&b[9..]) {
+            Ok(p) => p,
+            Err(e) => return Err(e),
+        };
+        return Ok(TsPacket {
+            header: header,
+            packet: packet,
+            phantom: PhantomData,
+        });
+    }
+
+    pub fn to_binary(&self) -> Result<Vec<u8>, Box<bincode::ErrorKind>> {
+        let mut h = match bincode::serialize(&self.header) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
+        let mut p = match bincode::serialize(&self.packet) {
+            Ok(p) => p,
+            Err(e) => return Err(e),
+        };
+        h.append(&mut p);
+        return Ok(h);
+    }
 }
 
 #[cfg(test)]
@@ -114,66 +149,25 @@ mod tests {
     }
 
     #[test]
-    fn test_header_serialize() {
-        let c = TsHeader {
-            byte: 0x01,
-            size: 255,
+    fn test_ts_packet_to_binary() {
+        let tsp = TsPacket {
+            header: TsHeader {
+                byte: OpCode::OpTsCreate as u8,
+                size: 10,
+            },
+            packet: TsCreate {
+                name: "ts-test".to_string(),
+                retention: 3000,
+            },
+            phantom: PhantomData,
         };
-        let b = serialize(&c);
-        assert_eq!(b.len(), 9);
+        let binary = tsp.to_binary().unwrap();
+        let decoded = TsPacket::from_binary(&binary);
+        assert_eq!(tsp, decoded.unwrap());
     }
 
     #[test]
-    fn test_header_deserialize() {
-        let c = TsHeader {
-            byte: 0x01,
-            size: 255,
-        };
-        let b = serialize(&c);
-        assert_eq!(b.len(), 9);
-        let d: TsHeader = deserialize(&b);
-        assert_eq!(d, c);
-    }
-
-    #[test]
-    fn test_create_serialize() {
-        let c = TsCreate {
-            name: "ts-test".to_string(),
-            retention: 3000,
-        };
-        let b = serialize(&c);
-        assert_eq!(b.len(), 19);
-    }
-
-    #[test]
-    fn test_create_deserialize() {
-        let c = TsCreate {
-            name: "ts-test".to_string(),
-            retention: 3000,
-        };
-        let b = serialize(&c);
-        assert_eq!(b.len(), 19);
-        let d: TsCreate = deserialize(&b);
-        assert_eq!(d, c);
-    }
-
-    #[test]
-    fn test_delete_serialize() {
-        let c = TsDelete {
-            0: "ts-test".to_string(),
-        };
-        let b = serialize(&c);
-        assert_eq!(b.len(), 15);
-    }
-
-    #[test]
-    fn test_delete_deserialize() {
-        let c = TsDelete {
-            0: "ts-test".to_string(),
-        };
-        let b = serialize(&c);
-        assert_eq!(b.len(), 15);
-        let d: TsDelete = deserialize(&b);
-        assert_eq!(d, c);
+    fn test_ts_packet_from_binary() {
+        test_ts_packet_to_binary();
     }
 }
