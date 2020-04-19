@@ -49,6 +49,9 @@ struct TsCreate {
     retention: i32,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+struct TsDelete(String);
+
 pub fn serialize<T: Serialize>(o: &T) -> Vec<u8> {
     return bincode::serialize(o).unwrap();
 }
@@ -57,24 +60,50 @@ pub fn deserialize<'a, T: Deserialize<'a>>(b: &'a Vec<u8>) -> T {
     return bincode::deserialize(&b[..]).unwrap();
 }
 
-#[test]
-fn test_create_serialize() {
-    let c = TsCreate {
-        name: "ts-test".to_string(),
-        retention: 3000,
-    };
-    let b = serialize(&c);
-    assert_eq!(b.len(), 19);
-}
+#[cfg(test)]
+mod tests {
 
-#[test]
-fn test_create_deserialize() {
-    let c = TsCreate {
-        name: "ts-test".to_string(),
-        retention: 3000,
-    };
-    let b = serialize(&c);
-    assert_eq!(b.len(), 19);
-    let d: TsCreate = deserialize(&b);
-    assert_eq!(d, c);
+    use super::*;
+
+    #[test]
+    fn test_create_serialize() {
+        let c = TsCreate {
+            name: "ts-test".to_string(),
+            retention: 3000,
+        };
+        let b = serialize(&c);
+        assert_eq!(b.len(), 19);
+    }
+
+    #[test]
+    fn test_create_deserialize() {
+        let c = TsCreate {
+            name: "ts-test".to_string(),
+            retention: 3000,
+        };
+        let b = serialize(&c);
+        assert_eq!(b.len(), 19);
+        let d: TsCreate = deserialize(&b);
+        assert_eq!(d, c);
+    }
+
+    #[test]
+    fn test_delete_serialize() {
+        let c = TsDelete {
+            0: "ts-test".to_string(),
+        };
+        let b = serialize(&c);
+        assert_eq!(b.len(), 15);
+    }
+
+    #[test]
+    fn test_delete_deserialize() {
+        let c = TsDelete {
+            0: "ts-test".to_string(),
+        };
+        let b = serialize(&c);
+        assert_eq!(b.len(), 15);
+        let d: TsDelete = deserialize(&b);
+        assert_eq!(d, c);
+    }
 }

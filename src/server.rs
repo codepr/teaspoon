@@ -117,7 +117,7 @@ impl Server {
                         // A new connection (possibly more than one) arrived, we accept it and
                         // track it inserting it into the server hashmap
                         match listener.accept() {
-                            Ok((mut socket, _)) => {
+                            Ok((socket, _)) => {
                                 counter += 1;
                                 let token = Token(counter);
                                 let mut client = Client::new(socket);

@@ -93,7 +93,7 @@ impl TimeSeries {
         self.records.push(r);
         if let Some(r) = self.retention {
             let last = self.records.last().unwrap();
-            let oldest_valid = self.search(last.timestamp).unwrap_err();
+            let oldest_valid = self.search(last.timestamp).unwrap_err() - r as usize;
             // Shrink vector by dropping first 0..oldest_valid indexes values
             self.records.drain(0..oldest_valid);
         }
@@ -184,157 +184,163 @@ impl TimeSeries {
 ///   UNIT TESTS   ///
 //////////////////////
 
-#[test]
-fn test_ts_new() {
-    let ts = TimeSeries::new("test-ts".to_string(), Some(3000));
-    assert_eq!(ts.name, "test-ts");
-    assert_eq!(ts.retention, Some(3000));
-}
+#[cfg(test)]
+mod tests {
 
-#[test]
-fn test_ts_add_point() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r = Record::new(12.98);
-    ts.add_point(r);
-    assert_eq!(ts.records.len(), 1);
-    assert_eq!(ts.records[0].value, 12.98);
-}
+    use super::*;
 
-#[test]
-fn test_ts_avg() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r1 = Record::new(12.98);
-    let r2 = Record::new(19.63);
-    let r3 = Record::new(11.28);
-    let r4 = Record::new(15.96);
-    ts.add_point(r1);
-    ts.add_point(r2);
-    ts.add_point(r3);
-    ts.add_point(r4);
-    let avg = ts.avg();
-    assert_eq!(avg, 14.9625);
-}
+    #[test]
+    fn test_ts_new() {
+        let ts = TimeSeries::new("test-ts".to_string(), Some(3000));
+        assert_eq!(ts.name, "test-ts");
+        assert_eq!(ts.retention, Some(3000));
+    }
 
-#[test]
-fn test_ts_avg_interval() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r1 = Record::new(12.98);
-    sleep(Duration::new(0, 5e8 as u32));
-    let r2 = Record::new(19.63);
-    let r3 = Record::new(11.28);
-    sleep(Duration::new(0, 5e8 as u32));
-    let r4 = Record::new(15.96);
-    ts.add_point(r1);
-    ts.add_point(r2);
-    ts.add_point(r3);
-    ts.add_point(r4);
-    let avg = ts.avg_interval(500 as u128).unwrap();
-    assert_eq!(avg, [12.98, 15.454999999999998, 15.96]);
-}
+    #[test]
+    fn test_ts_add_point() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r = Record::new(12.98);
+        ts.add_point(r);
+        assert_eq!(ts.records.len(), 1);
+        assert_eq!(ts.records[0].value, 12.98);
+    }
 
-#[test]
-fn test_ts_index() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r1 = Record::new(12.98);
-    let r2 = Record::new(19.63);
-    let r3 = Record::new(11.28);
-    let r4 = Record::new(15.96);
-    ts.add_point(r1);
-    ts.add_point(r2);
-    ts.add_point(r3);
-    ts.add_point(r4);
-    assert_eq!(ts[1].value, 19.63);
-    assert_eq!(ts[3].value, 15.96);
-}
+    #[test]
+    fn test_ts_avg() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r1 = Record::new(12.98);
+        let r2 = Record::new(19.63);
+        let r3 = Record::new(11.28);
+        let r4 = Record::new(15.96);
+        ts.add_point(r1);
+        ts.add_point(r2);
+        ts.add_point(r3);
+        ts.add_point(r4);
+        let avg = ts.avg();
+        assert_eq!(avg, 14.9625);
+    }
 
-#[test]
-fn test_ts_len() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    assert_eq!(ts.len(), 0);
-    let r1 = Record::new(12.98);
-    ts.add_point(r1);
-    assert_eq!(ts.len(), 1);
-}
+    #[test]
+    fn test_ts_avg_interval() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r1 = Record::new(12.98);
+        sleep(Duration::new(0, 5e8 as u32));
+        let r2 = Record::new(19.63);
+        let r3 = Record::new(11.28);
+        sleep(Duration::new(0, 5e8 as u32));
+        let r4 = Record::new(15.96);
+        ts.add_point(r1);
+        ts.add_point(r2);
+        ts.add_point(r3);
+        ts.add_point(r4);
+        let avg = ts.avg_interval(500 as u128).unwrap();
+        assert_eq!(avg, [12.98, 15.454999999999998, 15.96]);
+    }
 
-#[test]
-fn test_ts_is_empty() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    assert_eq!(ts.is_empty(), true);
-    let r1 = Record::new(12.98);
-    ts.add_point(r1);
-    assert_eq!(ts.is_empty(), false);
-}
+    #[test]
+    fn test_ts_index() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r1 = Record::new(12.98);
+        let r2 = Record::new(19.63);
+        let r3 = Record::new(11.28);
+        let r4 = Record::new(15.96);
+        ts.add_point(r1);
+        ts.add_point(r2);
+        ts.add_point(r3);
+        ts.add_point(r4);
+        assert_eq!(ts[1].value, 19.63);
+        assert_eq!(ts[3].value, 15.96);
+    }
 
-#[test]
-fn test_ts_max() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r1 = Record::new(12.98);
-    let r2 = Record::new(19.63);
-    let r3 = Record::new(11.28);
-    let r4 = Record::new(15.96);
-    ts.add_point(r1);
-    ts.add_point(r2);
-    ts.add_point(r3);
-    ts.add_point(r4);
-    assert_eq!(ts.max(), Some(19.63));
-}
+    #[test]
+    fn test_ts_len() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        assert_eq!(ts.len(), 0);
+        let r1 = Record::new(12.98);
+        ts.add_point(r1);
+        assert_eq!(ts.len(), 1);
+    }
 
-#[test]
-fn test_ts_min() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r1 = Record::new(12.98);
-    let r2 = Record::new(19.63);
-    let r3 = Record::new(11.28);
-    let r4 = Record::new(15.96);
-    ts.add_point(r1);
-    ts.add_point(r2);
-    ts.add_point(r3);
-    ts.add_point(r4);
-    assert_eq!(ts.min(), Some(11.28));
-}
+    #[test]
+    fn test_ts_is_empty() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        assert_eq!(ts.is_empty(), true);
+        let r1 = Record::new(12.98);
+        ts.add_point(r1);
+        assert_eq!(ts.is_empty(), false);
+    }
 
-#[test]
-fn test_ts_search() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r1 = Record::new(12.98);
-    sleep(Duration::new(0, 5e8 as u32));
-    let r2 = Record::new(19.63);
-    let r3 = Record::new(11.28);
-    sleep(Duration::new(0, 5e8 as u32));
-    let r4 = Record::new(15.96);
-    let timestamp_1 = r2.timestamp;
-    let timestamp_2 = timestamp_1 + 10;
-    ts.add_point(r1);
-    ts.add_point(r2);
-    ts.add_point(r3);
-    ts.add_point(r4);
-    assert_eq!(ts.search(timestamp_1), Err(1));
-    assert_eq!(ts.search(timestamp_2), Err(3));
-}
+    #[test]
+    fn test_ts_max() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r1 = Record::new(12.98);
+        let r2 = Record::new(19.63);
+        let r3 = Record::new(11.28);
+        let r4 = Record::new(15.96);
+        ts.add_point(r1);
+        ts.add_point(r2);
+        ts.add_point(r3);
+        ts.add_point(r4);
+        assert_eq!(ts.max(), Some(19.63));
+    }
 
-#[test]
-fn test_ts_range() {
-    let mut ts = TimeSeries::new("test-ts".to_string(), None);
-    let r1 = Record::new(12.98);
-    sleep(Duration::new(0, 5e8 as u32));
-    let r2 = Record::new(19.63);
-    let r3 = Record::new(11.28);
-    sleep(Duration::new(0, 5e8 as u32));
-    let r4 = Record::new(15.96);
-    let timestamp_1 = r2.timestamp;
-    let timestamp_2 = r4.timestamp;
-    ts.add_point(r1);
-    ts.add_point(r2);
-    ts.add_point(r3);
-    ts.add_point(r4);
-    let range = ts.range(timestamp_1, timestamp_2).unwrap();
-    assert_eq!(range.len(), 3);
-    assert_eq!(range[0].value, 19.63);
-    assert_eq!(range[2].value, 15.96);
-}
+    #[test]
+    fn test_ts_min() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r1 = Record::new(12.98);
+        let r2 = Record::new(19.63);
+        let r3 = Record::new(11.28);
+        let r4 = Record::new(15.96);
+        ts.add_point(r1);
+        ts.add_point(r2);
+        ts.add_point(r3);
+        ts.add_point(r4);
+        assert_eq!(ts.min(), Some(11.28));
+    }
 
-#[test]
-fn test_record_new() {
-    let r = Record::new(12.98);
-    assert_eq!(r.value, 12.98);
+    #[test]
+    fn test_ts_search() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r1 = Record::new(12.98);
+        sleep(Duration::new(0, 5e8 as u32));
+        let r2 = Record::new(19.63);
+        let r3 = Record::new(11.28);
+        sleep(Duration::new(0, 5e8 as u32));
+        let r4 = Record::new(15.96);
+        let timestamp_1 = r2.timestamp;
+        let timestamp_2 = timestamp_1 + 10;
+        ts.add_point(r1);
+        ts.add_point(r2);
+        ts.add_point(r3);
+        ts.add_point(r4);
+        assert_eq!(ts.search(timestamp_1), Err(1));
+        assert_eq!(ts.search(timestamp_2), Err(3));
+    }
+
+    #[test]
+    fn test_ts_range() {
+        let mut ts = TimeSeries::new("test-ts".to_string(), None);
+        let r1 = Record::new(12.98);
+        sleep(Duration::new(0, 5e8 as u32));
+        let r2 = Record::new(19.63);
+        let r3 = Record::new(11.28);
+        sleep(Duration::new(0, 5e8 as u32));
+        let r4 = Record::new(15.96);
+        let timestamp_1 = r2.timestamp;
+        let timestamp_2 = r4.timestamp;
+        ts.add_point(r1);
+        ts.add_point(r2);
+        ts.add_point(r3);
+        ts.add_point(r4);
+        let range = ts.range(timestamp_1, timestamp_2).unwrap();
+        assert_eq!(range.len(), 3);
+        assert_eq!(range[0].value, 19.63);
+        assert_eq!(range[2].value, 15.96);
+    }
+
+    #[test]
+    fn test_record_new() {
+        let r = Record::new(12.98);
+        assert_eq!(r.value, 12.98);
+    }
 }
